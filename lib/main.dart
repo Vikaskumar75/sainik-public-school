@@ -1,22 +1,26 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:webview_flutter/webview_flutter.dart';
+
 void main() {
-  runApp(MaterialApp(home: WebViewExample()));
+  runApp(MaterialApp(home: SainikPublicSchool()));
 }
 
-class WebViewExample extends StatefulWidget {
+class SainikPublicSchool extends StatefulWidget {
   @override
-  _WebViewExampleState createState() => _WebViewExampleState();
+  _SainikPublicSchoolState createState() => _SainikPublicSchoolState();
 }
 
-class _WebViewExampleState extends State<WebViewExample> {
+class _SainikPublicSchoolState extends State<SainikPublicSchool> {
   final Completer<WebViewController> _controller =
       Completer<WebViewController>();
+
+  late WebViewController controller;
 
   Future<void> getPermessions() async {
     Map<Permission, PermissionStatus> statuses = await [
@@ -42,39 +46,59 @@ class _WebViewExampleState extends State<WebViewExample> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Builder(builder: (BuildContext context) {
-          return WebView(
-            initialUrl: 'https://sainikpublicschoolbahadurgarh.com/',
-            javascriptMode: JavascriptMode.unrestricted,
-            onWebViewCreated: (WebViewController webViewController) {
-              _controller.complete(webViewController);
+    return WillPopScope(
+      child: Scaffold(
+        body: SafeArea(
+          child: Builder(
+            builder: (BuildContext context) {
+              return WebView(
+                initialUrl: 'https://sainikpublicschoolbahadurgarh.com/',
+                javascriptMode: JavascriptMode.unrestricted,
+                onWebViewCreated: (WebViewController webViewController) {
+                  _controller.complete(webViewController);
+                  controller = webViewController;
+                },
+                javascriptChannels: <JavascriptChannel>{
+                  _toasterJavascriptChannel(context),
+                },
+                navigationDelegate: (NavigationRequest request) async {
+                  if (request.url.startsWith('https://us05web.zoom.us')) {
+                    await launch(request.url);
+                    return NavigationDecision.prevent;
+                  }
+                  return NavigationDecision.navigate;
+                },
+                gestureNavigationEnabled: true,
+              );
             },
-            javascriptChannels: <JavascriptChannel>{
-              _toasterJavascriptChannel(context),
-            },
-            navigationDelegate: (NavigationRequest request) async {
-              if (request.url.startsWith('https://us05web.zoom.us')) {
-                await launch(request.url);
-                return NavigationDecision.prevent;
-              }
-              return NavigationDecision.navigate;
-            },
-            gestureNavigationEnabled: true,
-          );
-        }),
+          ),
+        ),
       ),
+      onWillPop: () async {
+        return await navigationController();
+      },
     );
   }
 
   JavascriptChannel _toasterJavascriptChannel(BuildContext context) {
     return JavascriptChannel(
-        name: 'Toaster',
-        onMessageReceived: (JavascriptMessage message) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message.message)),
-          );
-        });
+      name: 'Toaster',
+      onMessageReceived: (JavascriptMessage message) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message.message)),
+        );
+      },
+    );
+  }
+
+  Future<bool> navigationController() async {
+    final String? url = await controller.currentUrl();
+    print(url);
+    if (url == 'https://sainikpublicschoolbahadurgarh.com/') {
+      return true;
+    } else {
+      controller.goBack();
+      return false;
+    }
   }
 }
